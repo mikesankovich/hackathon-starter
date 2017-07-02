@@ -143,15 +143,16 @@ passport.use(new GitHubStrategy({
   clientSecret: process.env.GITHUB_SECRET,
   callbackURL: '/auth/github/callback',
   passReqToCallback: true
-}, (req, accessToken, refreshToken, profile, done) => {
+}, async (req, accessToken, refreshToken, profile, done) => {
   if (req.user) {
-    User.findOne({ github: profile.id }, (err, existingUser) => {
+    try {
+      const existingUser = await User.findOneAsync({github: profile.id});
       if (existingUser) {
         req.flash('errors', { msg: 'There is already a GitHub account that belongs to you. Sign in with that account or delete it, then link it with your current account.' });
         done(err);
       } else {
-        User.findById(req.user.id, (err, user) => {
-          if (err) { return done(err); }
+        try {
+          const user = await User.findByIdAsync(req.user.id);
           user.github = profile.id;
           user.tokens.push({ kind: 'github', accessToken });
           user.profile.name = user.profile.name || profile.displayName;
@@ -162,17 +163,22 @@ passport.use(new GitHubStrategy({
             req.flash('info', { msg: 'GitHub account has been linked.' });
             done(err, user);
           });
-        });
+        } catch (e) {
+          return don(e);
+        }
+
       }
-    });
+    } catch (err) {
+      return done(err);
+    }
   } else {
-    User.findOne({ github: profile.id }, (err, existingUser) => {
-      if (err) { return done(err); }
+    try {
+      const existingUser = await User.findOneAsync({ github: profile.id });
       if (existingUser) {
         return done(null, existingUser);
       }
-      User.findOne({ email: profile._json.email }, (err, existingEmailUser) => {
-        if (err) { return done(err); }
+      try {
+        const existingEmailUser = await User.findOneAsync({ email: profile._json.email });
         if (existingEmailUser) {
           req.flash('errors', { msg: 'There is already an account using this email address. Sign in to that account and link it with GitHub manually from Account Settings.' });
           done(err);
@@ -189,8 +195,12 @@ passport.use(new GitHubStrategy({
             done(err, user);
           });
         }
-      });
-    });
+      } catch (e) {
+        return done (e);
+      }
+    } catch (err) {
+      if (err) { return done(err); }
+    }
   }
 }));
 
