@@ -196,7 +196,7 @@ passport.use(new GitHubStrategy({
           });
         }
       } catch (e) {
-        return done (e);
+        return done(e);
       }
     } catch (err) {
       if (err) { return done(err); }
@@ -211,32 +211,37 @@ passport.use(new TwitterStrategy({
   consumerSecret: process.env.TWITTER_SECRET,
   callbackURL: '/auth/twitter/callback',
   passReqToCallback: true
-}, (req, accessToken, tokenSecret, profile, done) => {
+}, async (req, accessToken, tokenSecret, profile, done) => {
   if (req.user) {
-    User.findOne({ twitter: profile.id }, (err, existingUser) => {
-      if (err) { return done(err); }
+    try {
+      const existingUser = await User.findOneAsync({ twitter: profile.id });
       if (existingUser) {
         req.flash('errors', { msg: 'There is already a Twitter account that belongs to you. Sign in with that account or delete it, then link it with your current account.' });
         done(err);
       } else {
-        User.findById(req.user.id, (err, user) => {
-          if (err) { return done(err); }
+        try {
+          const user = await User.findById(req.user.id);
+
           user.twitter = profile.id;
           user.tokens.push({ kind: 'twitter', accessToken, tokenSecret });
           user.profile.name = user.profile.name || profile.displayName;
           user.profile.location = user.profile.location || profile._json.location;
           user.profile.picture = user.profile.picture || profile._json.profile_image_url_https;
-          user.save((err) => {
-            if (err) { return done(err); }
+          user.save((error) => {
+            if (error) { return done(error); }
             req.flash('info', { msg: 'Twitter account has been linked.' });
-            done(err, user);
+            done(error, user);
           });
-        });
+        } catch (e) {
+          return done(e);
+        }
       }
-    });
+    } catch (err) {
+      return done(err);
+    }
   } else {
-    User.findOne({ twitter: profile.id }, (err, existingUser) => {
-      if (err) { return done(err); }
+    try {
+      const existingUser = await User.findOneAsync({ twitter: profile.id });
       if (existingUser) {
         return done(null, existingUser);
       }
@@ -250,10 +255,12 @@ passport.use(new TwitterStrategy({
       user.profile.name = profile.displayName;
       user.profile.location = profile._json.location;
       user.profile.picture = profile._json.profile_image_url_https;
-      user.save((err) => {
-        done(err, user);
+      user.save((error) => {
+        done(error, user);
       });
-    });
+    } catch (err) {
+      return done(err);
+    }
   }
 }));
 
